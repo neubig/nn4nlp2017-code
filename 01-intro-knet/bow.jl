@@ -48,9 +48,13 @@ dev = readdata("../data/classes/dev.txt")
 tst = readdata("../data/classes/test.txt")
 length.((trn, dev, tst))
 
+# Use KnetArray to initialize parameters on GPU, use Array to initialize on CPU:
+
+## param(dims...) = Param(Array(0.01f0 * randn(Float32, dims...)))
+param(dims...) = Param(KnetArray(0.01f0 * randn(Float32, dims...)))
+
 # Initialize the parameters of the BOW model as global variables W and b.
 
-param(dims...) = Param(KnetArray(0.01f0 * randn(Float32, dims...)))
 nwords = length(wdict)
 ntags = length(tdict)
 W = param(ntags, nwords)
