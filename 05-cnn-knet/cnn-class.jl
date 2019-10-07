@@ -22,7 +22,6 @@ function readdata(file)
     for line in eachline(file)
         y, x = split(line, " ||| ")
         y, x = t2i(y), w2i.(split(x))
-        length(x) < 3 && continue
         push!(instances, (x,[y]))
     end
     return instances
@@ -52,6 +51,10 @@ end
 # Then, we implement the forward propagation and loss calculation,
 
 function (model::CNN)(x)
+    windowsize = size(model.conv1d.w, 2)
+    if windowsize > length(x)
+        x = vcat(x, [PAD for i = 1:windowsize-length(x)])
+    end
     emb = model.embedding(x)
     T, E = size(emb); B = 1
     emb = reshape(emb, 1, T, E, B)
@@ -81,8 +84,8 @@ Linear(inputsize::Int, outputsize::Int) = Linear(
 
 mutable struct Conv; w; b; end
 (layer::Conv)(x) = conv4(layer.w, x; stride=1, padding=0) .+ layer.b
-Conv(embedsize::Int, nfilters::Int, kernelsize::Int) = Conv(
-    param(1, kernelsize, embedsize, nfilters),
+Conv(embedsize::Int, nfilters::Int, windowsize::Int) = Conv(
+    param(1, windowsize, embedsize, nfilters),
     param0(1, 1, nfilters, 1))
 
 # We initialize our model,
@@ -110,7 +113,7 @@ end
 
 # Finally, here is the training loop:
 
-function train(nepochs=100)
+function train(nepochs=20)
     for epoch=1:nepochs
         progress!(adam(model, shuffle(trn)))
 
