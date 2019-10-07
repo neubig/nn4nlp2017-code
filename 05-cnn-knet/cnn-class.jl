@@ -1,10 +1,22 @@
+# # Convolutional Sentiment Classification Network
+
 using Knet
 using Random, Statistics, Printf
 
+# We are using the data from Stanford Sentiment Treebank dataset
+# without tree information. First, we initialize our word->id and
+# tag->id collections and insert padding word "&lt;pad&gt;" and
+# unknown word "&lt;unk&gt;" symbols into word->id collection.
 
 wdict, tdict = Dict(), Dict()
 w2i(x) = get!(wdict, x, 1+length(wdict))
 t2i(x) = get!(tdict, x, 1+length(tdict))
+PAD = w2i("<pad>")
+UNK = w2i("<unk>")
+
+# In the data files, each line consists of sentiment and sentence
+# information separated by `|||`.
+
 function readdata(file)
     instances = []
     for line in eachline(file)
@@ -16,15 +28,20 @@ function readdata(file)
     return instances
 end
 
-S = w2i("<s>")
-UNK = w2i("<unk>")
+# After reading training data, we redefine ```w2i``` procedure to
+# avoid inserting new words into our vocabulary collection and then
+# read validation data.
+
 trn = readdata("../data/classes/train.txt")
 w2i(x) = get(wdict, x, UNK)
 t2i(x) = tdict[x]
-nwords = length(wdict)
-ntags = length(tdict)
+nwords, ntags = length(wdict), length(tdict)
 dev = readdata("../data/classes/test.txt")
 
+# We begin developing convolutional sentiment classification model.
+# Our model is a stack of five consecutive operations: word embeddings,
+# 1-dimensional convolution, max-pooling, ReLU activation and linear
+# prediction layer. First, we define our network,
 
 mutable struct CNN
     embedding
@@ -32,6 +49,7 @@ mutable struct CNN
     linear
 end
 
+# Then, we implement the forward propagation and loss calculation,
 
 function (model::CNN)(x)
     emb = model.embedding(x)
@@ -42,9 +60,11 @@ function (model::CNN)(x)
     output = model.linear(hidden)
 end
 
-
 (model::CNN)(x,y) = nll(model(x),y)
 
+
+# In order to make our network working, we need to implement ```Embedding```,
+# ```Linear``` and ```Conv``` layers,
 
 mutable struct Embedding; w; end
 (layer::Embedding)(x) = layer.w[x, :]
@@ -65,6 +85,7 @@ Conv(embedsize::Int, nfilters::Int, kernelsize::Int) = Conv(
     param(1, kernelsize, embedsize, nfilters),
     param0(1, 1, nfilters, 1))
 
+# We initialize our model,
 
 EMBEDSIZE = 64
 WINSIZE = KERNELSIZE = 3
@@ -74,6 +95,8 @@ model = CNN(
     Conv(EMBEDSIZE, NFILTERS, KERNELSIZE),
     Linear(NFILTERS, ntags))
 
+# We implement a validation procedure which computes accuracy and average loss
+# over the entire input data split.
 
 function validate(data)
     loss = correct = 0
@@ -85,6 +108,7 @@ function validate(data)
     return loss/length(data), correct/length(data)
 end
 
+# Finally, here is the training loop:
 
 function train(nepochs=100)
     for epoch=1:nepochs
